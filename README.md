@@ -1,31 +1,52 @@
-# go-federation-demo
-This is a POC project for graphql with apollo federation in gqlgen
+# 🚀 go-federation-demo
 
-To run this project.
+This is a **Proof of Concept (POC)** project demonstrating **GraphQL with Apollo Federation** using **gqlgen**.
 
-Open 4 different terminals
+---
 
-Terminal 1
+## 🧭 Project Structure
 
+This project contains the following services:
+
+- 🧑‍💼 `users` — User service (Go)
+- 📦 `products` — Product service (Go)
+- 💬 `reviews` — Review service (Go)
+- 🌐 `gateway` — Apollo Gateway (Node.js)
+
+---
+
+## 🏃‍♂️ How to Run the Project
+
+Open **4 different terminals**, one for each service.
+
+---
+
+### 🖥️ Terminal 1 – Users Service
+```bash
 cd users
 go mod tidy
-go run users/server.go
+go run server.go
+```
 
-Terminal 2
+### 🖥️ Terminal 2 – Products Service
+```bash
 
 cd products
 go mod tidy
-go run products/server.go
+go run server.go
+```
 
-Terminal 3
+### 🖥️ Terminal 3 – Reviews Service
+```bash
 
 cd reviews
 go mod tidy
-go run reviews/server.go
+go run server.go
+```
 
-Terminal 4
-
+### 🖥️ Terminal 4 – Apollo Gateway
+```bash
 npm install --save @apollo/gateway apollo-server graphql
 cd gateway
 node index.js
-
+```
