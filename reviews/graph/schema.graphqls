@@ -1,0 +1,42 @@
+type Review {
+	id: ID! 
+	body: String
+	author: User
+	product: Product
+}
+
+type User @key(fields: "id") {
+	id: ID! 
+	reviews: [Review]
+}
+
+type Product @key(fields: "id") {
+	id: ID! 
+	reviews: [Review]
+}
+
+type Mutation {
+  createReview(input: NewReview!): Review!
+  deleteReview(id: ID !): Review!
+  updateReview(id: ID!, input: UpdateReview!): Review!
+}
+
+input NewReview {
+  body: String!
+  authorID: ID!
+  productID: ID!
+}
+
+input UpdateReview {
+  body: String
+  productID: ID
+  authorID: ID
+}
+
+type Query {
+  review(id: ID!): Review
+}
+
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.7",
+        import: ["@key"])
