@@ -10,7 +10,19 @@ const gateway = new ApolloGateway({
     ],
 });
 
-const server = new ApolloServer({ gateway });
+const server = new ApolloServer({
+    gateway,
+    includeStacktraceInErrorResponses: false,
+
+    formatError: (formattedError) => {
+        // Remove serviceName from the extensions
+        if (formattedError.extensions) {
+            const { serviceName, ...rest } = formattedError.extensions;
+            formattedError.extensions = rest;
+        }
+        return formattedError;
+    },
+});
 const { url } = await startStandaloneServer(server, { listen: { port: 8085 } });
 
 console.log(`🚀 Gateway ready at ${url}`);

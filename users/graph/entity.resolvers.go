@@ -7,7 +7,7 @@ package graph
 import (
 	"context"
 	"database/sql"
-	"fmt"
+	errorhandler "users/errorHandler"
 	"users/graph/model"
 )
 
@@ -31,7 +31,7 @@ func (r *entityResolver) FindUserByID(ctx context.Context, id string) (*model.Us
 			return nil, nil
 		}
 		// Other DB error
-		return nil, fmt.Errorf("failed to query user: %w", err)
+		return nil, errorhandler.New("DB_ERROR", "failed to query user")
 	}
 
 	// Return the found user

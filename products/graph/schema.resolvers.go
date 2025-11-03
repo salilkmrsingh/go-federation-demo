@@ -8,6 +8,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	errorhandler "products/errorHandler"
 	"products/graph/model"
 )
 
@@ -19,13 +20,13 @@ func (r *mutationResolver) CreateProduct(ctx context.Context, name string, price
 	// Execute the insert
 	result, err := r.DB.ExecContext(ctx, query, name, price)
 	if err != nil {
-		return nil, fmt.Errorf("failed to insert product: %w", err)
+		return nil, errorhandler.New("DB_ERROR", "failed to insert product")
 	}
 
 	// Get the last inserted ID
 	id, err := result.LastInsertId()
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve inserted ID: %w", err)
+		return nil, errorhandler.New("DB_ERROR", "failed to retrieve inserted ID")
 	}
 
 	// Return the created product
@@ -55,9 +56,9 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id string, input m
 
 	if err := row.Scan(&productID, &name, &price); err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("product with id %s not found", id)
+			return nil, errorhandler.New("NOT_FOUND", fmt.Sprintf("product with id %s not found", id))
 		}
-		return nil, fmt.Errorf("failed to fetch product: %w", err)
+		return nil, errorhandler.New("DB_ERROR", "failed to fetch product")
 	}
 
 	// Update fields if provided
@@ -77,7 +78,7 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id string, input m
 		WHERE id = ?
 	`, newName, newPrice, id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update product: %w", err)
+		return nil, errorhandler.New("DB_ERROR", "failed to update product")
 	}
 
 	// Return the updated product
@@ -107,9 +108,9 @@ func (r *mutationResolver) DeleteProduct(ctx context.Context, id string) (*model
 
 	if err := row.Scan(&productID, &name, &price); err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("product with id %s not found", id)
+			return nil, errorhandler.New("NOT_FOUND", fmt.Sprintf("product with id %s not found", id))
 		}
-		return nil, fmt.Errorf("failed to fetch product before delete: %w", err)
+		return nil, errorhandler.New("DB_ERROR", "failed to fetch product before delete")
 	}
 
 	// Delete from DB
@@ -118,7 +119,7 @@ func (r *mutationResolver) DeleteProduct(ctx context.Context, id string) (*model
 		WHERE id = ?
 	`, id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to delete product: %w", err)
+		return nil, errorhandler.New("DB_ERROR", "failed to delete product")
 	}
 
 	// Return deleted product info
@@ -137,7 +138,7 @@ func (r *queryResolver) Products(ctx context.Context) ([]*model.Product, error) 
 
 	rows, err := r.DB.QueryContext(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query products: %w", err)
+		return nil, errorhandler.New("DB_ERROR", "failed to query products")
 	}
 	defer rows.Close()
 
@@ -146,14 +147,14 @@ func (r *queryResolver) Products(ctx context.Context) ([]*model.Product, error) 
 	for rows.Next() {
 		var product model.Product
 		if err := rows.Scan(&product.ID, &product.Name, &product.Price); err != nil {
-			return nil, fmt.Errorf("failed to scan product: %w", err)
+			return nil, errorhandler.New("DB_ERROR", "failed to scan product")
 		}
 		products = append(products, &product)
 	}
 
 	// Check for iteration errors
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("row iteration error: %w", err)
+		return nil, errorhandler.New("DB_ERROR", "row iteration error")
 	}
 
 	return products, nil

@@ -8,6 +8,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	errorhandler "products/errorHandler"
 	"products/graph/model"
 	"strconv"
 )
@@ -17,7 +18,7 @@ func (r *entityResolver) FindProductByID(ctx context.Context, id string) (*model
 	// Convert the string ID from GraphQL into an integer
 	productID, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("invalid product ID: %w", err)
+		return nil, errorhandler.New("NOT_FOUND", fmt.Sprintf("invalid product ID: %s", id))
 	}
 
 	// SQL query
@@ -37,7 +38,7 @@ func (r *entityResolver) FindProductByID(ctx context.Context, id string) (*model
 			// No product found
 			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to query product: %w", err)
+		return nil, errorhandler.New("DB_ERROR", "failed to query product")
 	}
 
 	// Return the found product

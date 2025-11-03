@@ -8,6 +8,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	errorhandler "reviews/errorHandler"
 	"reviews/graph/model"
 )
 
@@ -19,7 +20,7 @@ func (r *mutationResolver) CreateReview(ctx context.Context, input model.NewRevi
 		VALUES (?, ?, ?)
 	`, input.Body, input.AuthorID, input.ProductID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to insert review: %w", err)
+		return nil, errorhandler.New("DB_ERROR", "failed to insert review")
 	}
 
 	// Optional: get the new review ID
@@ -63,9 +64,9 @@ func (r *mutationResolver) DeleteReview(ctx context.Context, id string) (*model.
 
 	if err := row.Scan(&reviewID, &body, &authorID, &productID); err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("review with id %s not found", id)
+			return nil, errorhandler.New("NOT_FOUND", fmt.Sprintf("review with id %s not found", id))
 		}
-		return nil, fmt.Errorf("failed to fetch review before delete: %w", err)
+		return nil, errorhandler.New("DB_ERROR", "failed to fetch review before delete")
 	}
 
 	// Delete the review
@@ -74,7 +75,7 @@ func (r *mutationResolver) DeleteReview(ctx context.Context, id string) (*model.
 		WHERE id = ?
 	`, id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to delete review: %w", err)
+		return nil, errorhandler.New("DB_ERROR", "failed to delete review")
 	}
 
 	// Build the review object to return
@@ -114,9 +115,9 @@ func (r *mutationResolver) UpdateReview(ctx context.Context, id string, input mo
 	)
 	if err := row.Scan(&reviewID, &body, &authorID, &productID); err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("review with id %s not found", id)
+			return nil, errorhandler.New("NOT_FOUND", fmt.Sprintf("review with id %s not found", id))
 		}
-		return nil, fmt.Errorf("failed to fetch review: %w", err)
+		return nil, errorhandler.New("DB_ERROR", "failed to fetch review")
 	}
 
 	// Apply updates if provided
@@ -136,7 +137,7 @@ func (r *mutationResolver) UpdateReview(ctx context.Context, id string, input mo
 		WHERE id = ?
 	`, newBody, newProductID, id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update review: %w", err)
+		return nil, errorhandler.New("DB_ERROR", "failed to update review")
 	}
 
 	// Return the updated object
@@ -159,7 +160,7 @@ func (r *productResolver) Reviews(ctx context.Context, obj *model.Product) ([]*m
 		WHERE product_id = ?
 	`, obj.ID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query reviews: %w", err)
+		return nil, errorhandler.New("DB_ERROR", "failed to query reviews")
 	}
 	defer rows.Close()
 
@@ -169,7 +170,7 @@ func (r *productResolver) Reviews(ctx context.Context, obj *model.Product) ([]*m
 		var id, body, authorID string
 
 		if err := rows.Scan(&id, &body, &authorID); err != nil {
-			return nil, fmt.Errorf("failed to scan row: %w", err)
+			return nil, errorhandler.New("DB_ERROR", "failed to scan row")
 		}
 
 		review := &model.Review{
@@ -185,7 +186,7 @@ func (r *productResolver) Reviews(ctx context.Context, obj *model.Product) ([]*m
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating rows: %w", err)
+		return nil, errorhandler.New("DB_ERROR", "error iterating rows")
 	}
 
 	return reviews, nil
@@ -210,7 +211,7 @@ func (r *queryResolver) Review(ctx context.Context, id string) (*model.Review, e
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to get review: %w", err)
+		return nil, errorhandler.New("DB_ERROR", "failed to get review")
 	}
 
 	review := &model.Review{
@@ -245,7 +246,7 @@ func (r *reviewResolver) Author(ctx context.Context, obj *model.Review) (*model.
 		if err == sql.ErrNoRows {
 			return nil, nil // no author found
 		}
-		return nil, fmt.Errorf("failed to fetch author: %w", err)
+		return nil, errorhandler.New("DB_ERROR", "failed to fetch author")
 	}
 
 	return &model.User{ID: authorID}, nil
@@ -267,7 +268,7 @@ func (r *reviewResolver) Product(ctx context.Context, obj *model.Review) (*model
 		if err == sql.ErrNoRows {
 			return nil, nil // review not found
 		}
-		return nil, fmt.Errorf("failed to fetch product: %w", err)
+		return nil, errorhandler.New("DB_ERROR", "failed to fetch product")
 	}
 
 	return &model.Product{ID: productID}, nil
@@ -281,7 +282,7 @@ func (r *userResolver) Reviews(ctx context.Context, obj *model.User) ([]*model.R
 		WHERE author_id = ?
 	`, obj.ID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query reviews for user %s: %w", obj.ID, err)
+		return nil, errorhandler.New("DB_ERROR", fmt.Sprintf("failed to query reviews for user %s", obj.ID))
 	}
 	defer rows.Close()
 
@@ -295,7 +296,7 @@ func (r *userResolver) Reviews(ctx context.Context, obj *model.User) ([]*model.R
 		)
 
 		if err := rows.Scan(&id, &body, &productID); err != nil {
-			return nil, fmt.Errorf("failed to scan review: %w", err)
+			return nil, errorhandler.New("DB_ERROR", "failed to scan review")
 		}
 
 		review := &model.Review{
@@ -316,7 +317,7 @@ func (r *userResolver) Reviews(ctx context.Context, obj *model.User) ([]*model.R
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating user reviews: %w", err)
+		return nil, errorhandler.New("DB_ERROR", "error iterating user reviews")
 	}
 
 	return reviews, nil

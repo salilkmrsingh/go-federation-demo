@@ -8,6 +8,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	errorhandler "users/errorHandler"
 	"users/graph/model"
 )
 
@@ -17,13 +18,13 @@ func (r *mutationResolver) CreateUser(ctx context.Context, name string, email st
 
 	result, err := r.DB.ExecContext(ctx, query, name, email)
 	if err != nil {
-		return nil, fmt.Errorf("failed to insert user: %w", err)
+		return nil, errorhandler.New("INSERTION_FAILED", "failed to insert user")
 	}
 
 	// Get the last inserted ID
 	id, err := result.LastInsertId()
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve inserted ID: %w", err)
+		return nil, errorhandler.New("ID_FETCH_FAILED", "failed to retrieve inserted ID")
 	}
 
 	// Build and return the created user
@@ -52,9 +53,9 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, id string, input mode
 
 	if err := row.Scan(&userID, &name, &email); err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("user with id %s not found", id)
+			return nil, errorhandler.New("NOT_FOUND", fmt.Sprintf("user with id %s not found", id))
 		}
-		return nil, fmt.Errorf("failed to fetch user: %w", err)
+		return nil, errorhandler.New("NOT_FOUND", "failed to fetch user")
 	}
 
 	newName := name.String
@@ -73,7 +74,7 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, id string, input mode
 		WHERE id = ?
 	`, newName, newEmail, id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update user: %w", err)
+		return nil, errorhandler.New("UPDATE_FAILED", "failed to update user")
 	}
 
 	updated := &model.User{
@@ -102,9 +103,9 @@ func (r *mutationResolver) DeleteUser(ctx context.Context, id string) (*model.Us
 
 	if err := row.Scan(&userID, &name, &email); err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("user with id %s not found", id)
+			return nil, errorhandler.New("NOT_FOUND", fmt.Sprintf("user with id %s not found", id))
 		}
-		return nil, fmt.Errorf("failed to fetch user before delete: %w", err)
+		return nil, errorhandler.New("NOT_FOUND", "failed to fetch user before delete")
 	}
 
 	_, err := r.DB.ExecContext(ctx, `
@@ -112,7 +113,7 @@ func (r *mutationResolver) DeleteUser(ctx context.Context, id string) (*model.Us
 		WHERE id = ?
 	`, id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to delete user: %w", err)
+		return nil, errorhandler.New("DELETION_FAILED", "failed to delete user")
 	}
 
 	deleted := &model.User{
@@ -131,7 +132,7 @@ func (r *queryResolver) Users(ctx context.Context) ([]*model.User, error) {
 
 	rows, err := r.DB.QueryContext(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query users: %w", err)
+		return nil, errorhandler.New("DB_ERROR", "failed to query users")
 	}
 	defer rows.Close()
 
@@ -140,13 +141,13 @@ func (r *queryResolver) Users(ctx context.Context) ([]*model.User, error) {
 	for rows.Next() {
 		var user model.User
 		if err := rows.Scan(&user.ID, &user.Name, &user.Email); err != nil {
-			return nil, fmt.Errorf("failed to scan user: %w", err)
+			return nil, errorhandler.New("DB_ERROR", "failed to scan user")
 		}
 		users = append(users, &user)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("row iteration error: %w", err)
+		return nil, errorhandler.New("DB_ERROR", "row iteration error")
 	}
 
 	return users, nil
