@@ -2,6 +2,18 @@
 
 package model
 
+type CreateUser struct {
+	Name     string              `json:"name"`
+	Email    string              `json:"email"`
+	Settings *CreateUserSettings `json:"settings,omitempty"`
+}
+
+type CreateUserSettings struct {
+	Theme                *string `json:"theme,omitempty"`
+	Language             *string `json:"language,omitempty"`
+	NotificationsEnabled *bool   `json:"notificationsEnabled,omitempty"`
+}
+
 type Mutation struct {
 }
 
@@ -14,9 +26,18 @@ type UpdateUser struct {
 }
 
 type User struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
+	ID       string        `json:"id"`
+	Name     string        `json:"name"`
+	Email    string        `json:"email"`
+	Settings *UserSettings `json:"settings,omitempty"`
 }
 
 func (User) IsEntity() {}
+
+type UserSettings struct {
+	ID                   string  `json:"id"`
+	UserID               string  `json:"userId"`
+	Theme                *string `json:"theme,omitempty"`
+	Language             *string `json:"language,omitempty"`
+	NotificationsEnabled *bool   `json:"notificationsEnabled,omitempty"`
+}

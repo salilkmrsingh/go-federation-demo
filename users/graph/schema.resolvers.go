@@ -8,15 +8,17 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	errorhandler "users/errorHandler"
 	"users/graph/model"
+	"users/saga"
 )
 
 // CreateUser is the resolver for the createUser field.
 func (r *mutationResolver) CreateUser(ctx context.Context, name string, email string) (*model.User, error) {
 	query := `INSERT INTO users (name, email) VALUES (?, ?)`
 
-	result, err := r.DB.ExecContext(ctx, query, name, email)
+	result, err := r.DBUser.ExecContext(ctx, query, name, email)
 	if err != nil {
 		return nil, errorhandler.New("INSERTION_FAILED", "failed to insert user")
 	}
@@ -29,7 +31,7 @@ func (r *mutationResolver) CreateUser(ctx context.Context, name string, email st
 
 	// Build and return the created user
 	user := &model.User{
-		ID:    fmt.Sprintf("%d", id), // Convert int64 → string if your GraphQL ID type is string
+		ID:    fmt.Sprintf("%v", id), // Convert int64 → string if your GraphQL ID type is string
 		Name:  name,
 		Email: email,
 	}
@@ -39,7 +41,7 @@ func (r *mutationResolver) CreateUser(ctx context.Context, name string, email st
 
 // UpdateUser is the resolver for the updateUser field.
 func (r *mutationResolver) UpdateUser(ctx context.Context, id string, input model.UpdateUser) (*model.User, error) {
-	row := r.DB.QueryRowContext(ctx, `
+	row := r.DBUser.QueryRowContext(ctx, `
 		SELECT id, name, email
 		FROM users
 		WHERE id = ?
@@ -68,7 +70,7 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, id string, input mode
 		newEmail = *input.Email
 	}
 
-	_, err := r.DB.ExecContext(ctx, `
+	_, err := r.DBUser.ExecContext(ctx, `
 		UPDATE users
 		SET name = ?, email = ?
 		WHERE id = ?
@@ -84,12 +86,11 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, id string, input mode
 	}
 
 	return updated, nil
-
 }
 
 // DeleteUser is the resolver for the deleteUser field.
 func (r *mutationResolver) DeleteUser(ctx context.Context, id string) (*model.User, error) {
-	row := r.DB.QueryRowContext(ctx, `
+	row := r.DBUser.QueryRowContext(ctx, `
 		SELECT id, name, email
 		FROM users
 		WHERE id = ?
@@ -108,7 +109,7 @@ func (r *mutationResolver) DeleteUser(ctx context.Context, id string) (*model.Us
 		return nil, errorhandler.New("NOT_FOUND", "failed to fetch user before delete")
 	}
 
-	_, err := r.DB.ExecContext(ctx, `
+	_, err := r.DBUser.ExecContext(ctx, `
 		DELETE FROM users
 		WHERE id = ?
 	`, id)
@@ -123,14 +124,72 @@ func (r *mutationResolver) DeleteUser(ctx context.Context, id string) (*model.Us
 	}
 
 	return deleted, nil
+}
 
+// CreateUserWithSettings is the resolver for the createUserWithSettings field.
+func (r *mutationResolver) CreateUserWithSettings(ctx context.Context, input model.CreateUser) (*model.User, error) {
+	var userID string
+
+	s := saga.Saga{
+		Steps: []saga.SagaStep{
+			{
+				Name: "CreateUser",
+				Original: func() (string, error) {
+					res, err := r.DBUser.Exec(`INSERT INTO users (name, email) VALUES (?, ?)`, input.Name, input.Email)
+					if err != nil {
+						return "", err
+					}
+					id, _ := res.LastInsertId()
+					userID = fmt.Sprintf("%v", id)
+					log.Printf("Created user with ID %v", userID)
+					return userID, nil
+				},
+				Compensation: func(id string) error {
+					log.Printf("Deleting user with ID %v", id)
+					_, err := r.DBUser.Exec(`DELETE FROM users WHERE id = ?`, id)
+					return err
+				},
+			},
+			{
+				Name: "CreateUserSettings",
+				Original: func() (string, error) {
+					res, err := r.DBUserSetting.Exec(`
+						INSERT INTO user_settings (user_id, theme, language, notifications_enabled)
+						VALUES (?, ?, ?, ?)`,
+						userID, input.Settings.Theme, input.Settings.Language, input.Settings.NotificationsEnabled,
+					)
+					if err != nil {
+						return "", err
+					}
+					settingsID, _ := res.LastInsertId()
+					log.Printf("Created user_settings for user %v (ID %v)", userID, settingsID)
+					return fmt.Sprintf("%v", settingsID), nil
+				},
+				Compensation: func(id string) error {
+					log.Printf("Deleting user_settings ID %v", id)
+					_, err := r.DBUserSetting.Exec(`DELETE FROM user_settings WHERE id = ?`, id)
+					return err
+				},
+			},
+		},
+	}
+
+	if err := s.Run(); err != nil {
+		return nil, err
+	}
+
+	return &model.User{
+		ID:    userID,
+		Name:  input.Name,
+		Email: input.Email,
+	}, nil
 }
 
 // Users is the resolver for the users field.
 func (r *queryResolver) Users(ctx context.Context) ([]*model.User, error) {
 	query := `SELECT id, name, email FROM users`
 
-	rows, err := r.DB.QueryContext(ctx, query)
+	rows, err := r.DBUser.QueryContext(ctx, query)
 	if err != nil {
 		return nil, errorhandler.New("DB_ERROR", "failed to query users")
 	}
@@ -153,11 +212,35 @@ func (r *queryResolver) Users(ctx context.Context) ([]*model.User, error) {
 	return users, nil
 }
 
+// Settings is the resolver for the settings field.
+func (r *userResolver) Settings(ctx context.Context, obj *model.User) (*model.UserSettings, error) {
+	row := r.DBUserSetting.QueryRowContext(ctx, `
+		SELECT id, user_id, theme, language, notifications_enabled
+		FROM user_settings
+		WHERE user_id = ?
+	`, obj.ID)
+
+	var s model.UserSettings
+	err := row.Scan(&s.ID, &s.UserID, &s.Theme, &s.Language, &s.NotificationsEnabled)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // no settings found
+		}
+		return nil, fmt.Errorf("query user settings: %w", err)
+	}
+
+	return &s, nil
+}
+
 // Mutation returns MutationResolver implementation.
 func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
 
 // Query returns QueryResolver implementation.
 func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
+// User returns UserResolver implementation.
+func (r *Resolver) User() UserResolver { return &userResolver{r} }
+
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
+type userResolver struct{ *Resolver }

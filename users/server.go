@@ -25,10 +25,13 @@ func main() {
 
 	// adding db connection
 
-	database := db.Connect()
-	defer database.Close()
+	userDatabase := db.ConnectUser()
+	defer userDatabase.Close()
 
-	srv := handler.New(graph.NewExecutableSchema(graph.Config{Resolvers: &graph.Resolver{DB: database}}))
+	userSettingsDatbase := db.ConnectUserSettings()
+	defer userSettingsDatbase.Close()
+
+	srv := handler.New(graph.NewExecutableSchema(graph.Config{Resolvers: &graph.Resolver{DBUser: userDatabase, DBUserSetting: userSettingsDatbase}}))
 
 	srv.AddTransport(transport.Options{})
 	srv.AddTransport(transport.GET{})

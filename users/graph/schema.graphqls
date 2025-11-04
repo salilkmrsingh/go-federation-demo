@@ -6,6 +6,15 @@ type User @key(fields: "id") {
   id: ID!
   name: String!
   email: String!
+  settings: UserSettings
+}
+
+type UserSettings {
+  id: ID!
+  userId: ID!
+  theme: String
+  language: String
+  notificationsEnabled: Boolean
 }
 
 type Query {
@@ -16,9 +25,23 @@ type Mutation {
   createUser(name: String!, email: String!): User!
   updateUser(id: ID!, input: UpdateUser!): User!
   deleteUser(id: ID!): User
+  createUserWithSettings(input: CreateUser!): User!
 }
 
 input UpdateUser {
   name: String
   email: String
+}
+
+input CreateUser {
+  name: String!
+  email: String!
+  settings: CreateUserSettings
+}
+
+
+input CreateUserSettings {
+  theme: String
+  language: String
+  notificationsEnabled: Boolean
 }

@@ -20,7 +20,7 @@ func (r *entityResolver) FindUserByID(ctx context.Context, id string) (*model.Us
 	var user model.User
 
 	// Execute the query
-	err := r.DB.QueryRowContext(ctx, query, id).Scan(
+	err := r.DBUser.QueryRowContext(ctx, query, id).Scan(
 		&user.ID,
 		&user.Name,
 		&user.Email,

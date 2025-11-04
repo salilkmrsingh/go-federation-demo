@@ -7,7 +7,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func Connect() *sql.DB {
+func ConnectUser() *sql.DB {
 	db, err := sql.Open("sqlite3", "./user.db")
 	if err != nil {
 		log.Fatal(err)
